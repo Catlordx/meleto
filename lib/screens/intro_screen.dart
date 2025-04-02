@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:meleto/screens/auth/login_screen.dart';
+import 'package:meleto/screens/home_screen.dart';
 
 class IntroScreen extends StatefulWidget {
   const IntroScreen({super.key});
@@ -53,8 +55,8 @@ class _IntroScreenState extends State<IntroScreen> {
     Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder:
-            (context) => Scaffold(body: Center(child: Text("Home Screen"))),
+        builder: (context) => LoginScreen()
+            // (context) => Scaffold(body: Center(child: Text("Home Screen"))),
       ),
     );
   }
