@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:meleto/models/note.dart';
 import 'package:meleto/screens/auth/login_screen.dart';
 import 'package:meleto/screens/notes/note_detail_screen.dart';
+import 'package:meleto/screens/settings_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -10,10 +11,11 @@ class ProfileScreen extends StatefulWidget {
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProviderStateMixin {
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool _isLoading = false;
-  
+
   // 模拟用户数据
   final Map<String, dynamic> _userData = {
     'username': '弗拉特',
@@ -22,7 +24,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     'bio': '一个麻瓜',
     'joinDate': '2023-01-15',
   };
-  
+
   // 模拟用户笔记列表
   final List<Note> _userNotes = [
     Note(
@@ -46,7 +48,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
       likes: 23,
     ),
   ];
-  
+
   // 模拟收藏的笔记
   final List<Note> _favoriteNotes = [
     Note(
@@ -73,48 +75,7 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
     super.dispose();
   }
 
-  Future<void> _logout() async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('退出登录'),
-        content: const Text('确定要退出登录吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-    
-    if (confirmed == true) {
-      setState(() => _isLoading = true);
-      
-      try {
-        // 模拟退出登录
-        await Future.delayed(const Duration(seconds: 1));
-        
-        if (!mounted) return;
-        
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
-      } catch (e) {
-        if (!mounted) return;
-        
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('退出失败: ${e.toString()}')),
-        );
-      }
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -125,36 +86,34 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const SettingsScreen()),
+              );
               // 打开设置页面
             },
           ),
         ],
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: '我的笔记'),
-            Tab(text: '收藏'),
-          ],
+          tabs: const [Tab(text: '我的笔记'), Tab(text: '收藏')],
         ),
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : NestedScrollView(
-              headerSliverBuilder: (context, innerBoxIsScrolled) {
-                return [
-                  SliverToBoxAdapter(
-                    child: _buildProfileHeader(),
-                  ),
-                ];
-              },
-              body: TabBarView(
-                controller: _tabController,
-                children: [
-                  _buildNotesList(_userNotes, isUserNotes: true),
-                  _buildNotesList(_favoriteNotes),
-                ],
+      body:
+          _isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : NestedScrollView(
+                headerSliverBuilder: (context, innerBoxIsScrolled) {
+                  return [SliverToBoxAdapter(child: _buildProfileHeader())];
+                },
+                body: TabBarView(
+                  controller: _tabController,
+                  children: [
+                    _buildNotesList(_userNotes, isUserNotes: true),
+                    _buildNotesList(_favoriteNotes),
+                  ],
+                ),
               ),
-            ),
     );
   }
 
@@ -171,21 +130,18 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
           const SizedBox(height: 16),
           Text(
             _userData['username'],
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
           ),
           Text(
             _userData['email'],
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-              color: Colors.grey[600],
-            ),
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: Colors.grey[600]),
           ),
           const SizedBox(height: 8),
-          Text(
-            _userData['bio'],
-            textAlign: TextAlign.center,
-          ),
+          Text(_userData['bio'], textAlign: TextAlign.center),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -212,20 +168,14 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
               const SizedBox(width: 32),
               Column(
                 children: [
-                  Text(
-                    '38',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
+                  Text('38', style: Theme.of(context).textTheme.titleMedium),
                   const Text('获赞'),
                 ],
               ),
             ],
           ),
           const SizedBox(height: 16),
-          OutlinedButton(
-            onPressed: _logout,
-            child: const Text('退出登录'),
-          ),
+
           const Divider(height: 32),
         ],
       ),
@@ -234,11 +184,9 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
 
   Widget _buildNotesList(List<Note> notes, {bool isUserNotes = false}) {
     if (notes.isEmpty) {
-      return Center(
-        child: Text(isUserNotes ? '还没有创建笔记' : '还没有收藏笔记'),
-      );
+      return Center(child: Text(isUserNotes ? '还没有创建笔记' : '还没有收藏笔记'));
     }
-    
+
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: notes.length,
@@ -279,16 +227,17 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
                               // 删除笔记
                             }
                           },
-                          itemBuilder: (context) => [
-                            const PopupMenuItem(
-                              value: 'edit',
-                              child: Text('编辑'),
-                            ),
-                            const PopupMenuItem(
-                              value: 'delete',
-                              child: Text('删除'),
-                            ),
-                          ],
+                          itemBuilder:
+                              (context) => [
+                                const PopupMenuItem(
+                                  value: 'edit',
+                                  child: Text('编辑'),
+                                ),
+                                const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text('删除'),
+                                ),
+                              ],
                         ),
                     ],
                   ),
@@ -323,4 +272,4 @@ class _ProfileScreenState extends State<ProfileScreen> with SingleTickerProvider
   String _formatDate(DateTime dateTime) {
     return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')}';
   }
-}// TODO Implement this library.
+} // TODO Implement this library.

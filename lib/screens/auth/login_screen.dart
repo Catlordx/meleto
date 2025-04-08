@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:meleto/screens/home_screen.dart';
+import 'package:meleto/screens/auth/register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -24,8 +26,25 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      await Future.delayed(const Duration(seconds: 2)); // 模拟网络请求
-      setState(() => _isLoading = false);
+
+      try {
+        // 模拟网络请求
+        await Future.delayed(const Duration(seconds: 2));
+
+        // 在异步操作后检查 widget 是否仍然在树中
+        if (!mounted) return;
+
+        setState(() => _isLoading = false);
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (context) => HomeScreen()),
+        );
+      } catch (e) {
+        // 处理可能发生的错误
+        if (!mounted) return;
+
+        setState(() => _isLoading = false);
+        // 您可以在这里添加错误处理，比如显示 SnackBar
+      }
       // 在这里添加实际的登录逻辑
     }
   }
@@ -43,8 +62,8 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 const SizedBox(height: 48),
                 // const FlutterLogo(size: 100),
-                Image.asset('assets/images/logo.png', width: 100),
-                const SizedBox(height: 32),
+                Image.asset('assets/images/logo.png', width: 72),
+                const SizedBox(height: 24),
                 Text(
                   '欢迎回来',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
@@ -128,6 +147,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     const Text('没有账号？'),
                     TextButton(
                       onPressed: () {
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const RegisterScreen(),
+                          ),
+                        );
                         // 跳转到注册页面
                         print('立即注册');
                       },

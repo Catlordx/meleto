@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:meleto/screens/auth/login_screen.dart';
-import 'package:meleto/screens/home_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class IntroScreen extends StatefulWidget {
   const IntroScreen({super.key});
@@ -16,18 +16,18 @@ class _IntroScreenState extends State<IntroScreen> {
 
   final List<Widget> _pages = [
     IntroComponent(
-      title: "欢迎使用ToDo",
-      description: "让您的任务管理更简单、更高效",
+      title: "欢迎使用Meleto",
+      description: "让您的笔记管理更简单、更高效",
       imagePath: "assets/images/intro1.png",
     ),
     IntroComponent(
-      title: "任务管理",
-      description: "轻松创建任务、设置优先级、跟踪进度",
+      title: "笔记管理",
+      description: "轻松创建笔记、与他人交流分享、互相学习",
       imagePath: "assets/images/intro2.png",
     ),
     IntroComponent(
-      title: "及时提醒",
-      description: "永不错过重要任务，按时完成待办事项",
+      title: "本地存储",
+      description: "安全存储您的数据，随时随地访问",
       imagePath: "assets/images/intro3.png",
     ),
   ];
@@ -51,13 +51,17 @@ class _IntroScreenState extends State<IntroScreen> {
     }
   }
 
-  void _onFinish() {
+  Future<void> _onFinish() async {
+    // 保存用户已经看过介绍页面的状态
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasSeenIntro', true);
+
+    if (!mounted) return;
+
+    // 导航到登录页面
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(
-        builder: (context) => LoginScreen()
-            // (context) => Scaffold(body: Center(child: Text("Home Screen"))),
-      ),
+      MaterialPageRoute(builder: (context) => const LoginScreen()),
     );
   }
 
