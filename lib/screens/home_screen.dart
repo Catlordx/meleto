@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:meleto/models/note.dart';
 import 'package:meleto/screens/notes/note_detail_screen.dart';
 import 'package:meleto/screens/notes/create_note_screen.dart';
@@ -13,40 +15,49 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<Note> _notes = [
-    Note(
-      id: '1',
-      title: 'Flutter 基础知识',
-      content: 'Flutter是Google开发的UI工具包，可以使用一套代码库构建多平台应用...',
-      authorId: 'user1',
-      authorName: '张三',
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      tags: ['Flutter', '移动开发'],
-      likes: 15,
-    ),
-    Note(
-      id: '2',
-      title: 'Dart语言入门',
-      content: 'Dart是Google开发的计算机编程语言，可以用于web、服务器、移动应用和物联网等领域的开发...',
-      authorId: 'user2',
-      authorName: '李四',
-      createdAt: DateTime.now().subtract(const Duration(days: 5)),
-      tags: ['Dart', '编程语言'],
-      likes: 23,
-    ),
-    Note(
-      id: '3',
-      title: 'React Native vs Flutter',
-      content: '本文对比了React Native和Flutter在性能、开发效率和社区支持等方面的差异...',
-      authorId: 'user3',
-      authorName: '王五',
-      createdAt: DateTime.now().subtract(const Duration(days: 7)),
-      tags: ['Flutter', 'React Native', '对比'],
-      likes: 42,
-    ),
-  ];
-
+  List<Note> _notes = [];
+  bool _isLoading = true;
+  String? _errorMessage;
   int _selectedIndex = 0;
+  
+  @override
+  void initState() {
+    super.initState();
+    _fetchNotes();
+  }
+  
+  Future<void> _fetchNotes() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    
+    try {
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:8080/api/note/getall?sort=rating&page=1')
+      );
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final notesList = (data['data'] as List)
+            .map((noteJson) => Note.fromJson(noteJson))
+            .toList();
+            
+        setState(() {
+          _notes = notesList;
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('Failed to load notes: ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString();
+        _isLoading = false;
+      });
+      print('Error fetching notes: $e');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,23 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          // 实现下拉刷新逻辑
-          await Future.delayed(const Duration(seconds: 1));
-          // setState(() {
-          //   // 刷新数据
-          // });
-        },
-        child: ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: _notes.length,
-          itemBuilder: (context, index) {
-            final note = _notes[index];
-            return _buildNoteCard(note);
-          },
-        ),
-      ),
+      body: _buildBody(),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
           Navigator.push(
@@ -98,7 +93,6 @@ class _HomeScreenState extends State<HomeScreen> {
             _selectedIndex = index;
           });
           
-          // 实现底部导航栏切换逻辑
           if (index == 2) { // 个人资料页
             Navigator.push(
               context,
@@ -106,7 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
         },
-        items: [
+        items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: '首页',
@@ -120,6 +114,44 @@ class _HomeScreenState extends State<HomeScreen> {
             label: '我的',
           ),
         ],
+      ),
+    );
+  }
+  
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(),
+      );
+    }
+    
+    if (_errorMessage != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            const SizedBox(height: 16),
+            Text('加载失败: $_errorMessage'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _fetchNotes,
+              child: const Text('重试'),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    return RefreshIndicator(
+      onRefresh: _fetchNotes,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _notes.length,
+        itemBuilder: (context, index) {
+          final note = _notes[index];
+          return _buildNoteCard(note);
+        },
       ),
     );
   }
@@ -159,7 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   CircleAvatar(
                     radius: 12,
-                    child: Text(note.authorName[0]),
+                    child: Text(note.authorName.isNotEmpty ? note.authorName[0] : ''),
                   ),
                   const SizedBox(width: 8),
                   Text(note.authorName),
@@ -175,17 +207,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                children: note.tags.map((tag) {
-                  return Chip(
-                    label: Text(tag),
-                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    padding: EdgeInsets.zero,
-                    labelPadding: const EdgeInsets.symmetric(horizontal: 8),
-                  );
-                }).toList(),
-              ),
+              if (note.tags.isNotEmpty)
+                Wrap(
+                  spacing: 8,
+                  children: note.tags.map((tag) {
+                    return Chip(
+                      label: Text(tag),
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      padding: EdgeInsets.zero,
+                      labelPadding: const EdgeInsets.symmetric(horizontal: 8),
+                    );
+                  }).toList(),
+                ),
             ],
           ),
         ),

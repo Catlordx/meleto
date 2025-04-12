@@ -1,14 +1,14 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:meleto/models/note.dart';
+import 'package:meleto/models/review.dart';
 import 'package:meleto/screens/notes/edit_note_screen.dart';
 
 class NoteDetailScreen extends StatefulWidget {
   final String noteId;
-  
-  const NoteDetailScreen({
-    super.key,
-    required this.noteId,
-  });
+
+  const NoteDetailScreen({super.key, required this.noteId});
 
   @override
   State<NoteDetailScreen> createState() => _NoteDetailScreenState();
@@ -33,64 +33,96 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
   }
 
   Future<Note> _fetchNote() async {
-    // 模拟从API获取笔记数据
-    await Future.delayed(const Duration(seconds: 1));
-    return Note(
-      id: widget.noteId,
-      title: 'Flutter 基础知识详解',
-      content: '# Flutter简介\n\nFlutter是Google开发的开源UI工具包，可以仅通过一套代码库构建美观、原生的跨平台应用。\n\n## 为什么选择Flutter?\n\n* 快速开发\n* 表现力强且灵活的UI\n* 原生性能\n\n## Flutter架构\n\nFlutter包含几个关键部分：\n\n1. Dart平台\n2. Flutter引擎\n3. Foundation库\n4. 设计特定的widget\n\n## 开始使用Flutter\n\n```dart\nvoid main() {\n  runApp(MyApp());\n}\n\nclass MyApp extends StatelessWidget {\n  @override\n  Widget build(BuildContext context) {\n    return MaterialApp(\n      home: Scaffold(\n        appBar: AppBar(title: Text(\'Hello Flutter\')),\n        body: Center(child: Text(\'Hello World\')),\n      ),\n    );\n  }\n}\n```',
-      authorId: 'user1',
-      authorName: '张三',
-      createdAt: DateTime.now().subtract(const Duration(days: 2)),
-      tags: ['Flutter', '移动开发', '教程'],
-      likes: 28,
-      reviews: [
-        Review(
-          id: 'r1',
-          noteId: widget.noteId,
-          userId: 'user2',
-          userName: '李四',
-          content: '非常详细的Flutter入门教程，对我帮助很大！',
-          rating: 5,
-          createdAt: DateTime.now().subtract(const Duration(days: 1)),
-        ),
-        Review(
-          id: 'r2',
-          noteId: widget.noteId,
-          userId: 'user3',
-          userName: '王五',
-          content: '内容不错，但希望能有更多代码示例。',
-          rating: 4,
-          createdAt: DateTime.now().subtract(const Duration(hours: 5)),
-        ),
-      ],
-    );
+    try {
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:8080/api/note/getbyid?id=${widget.noteId}'),
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        return Note.fromJson(data);
+      } else {
+        throw Exception('Failed to load note: ${response.statusCode}');
+      }
+    } catch (e) {
+      // Fallback to mock data for development
+
+      // Mock data for development
+      return Note(
+        id: widget.noteId,
+        title: 'Flutter 基础知识详解',
+        content: '# Flutter简介\n\nFlutter是Google开发的开源UI工具包...',
+        authorId: '1',
+        authorName: '张三',
+        createdAt: DateTime.now().subtract(const Duration(days: 2)),
+        tags: ['Flutter', '移动开发', '教程'],
+        likes: 28,
+        reviews: [
+          Review(
+            id: 1,
+            rating: 5,
+            comment: '非常详细的Flutter入门教程，对我帮助很大！',
+            userId: 2,
+            noteId: int.parse(widget.noteId),
+            createdAt: DateTime.now().subtract(const Duration(days: 1)),
+            userName: '李四',
+          ),
+          Review(
+            id: 2,
+            rating: 4,
+            comment: '内容不错，但希望能有更多代码示例。',
+            userId: 3,
+            noteId: int.parse(widget.noteId),
+            createdAt: DateTime.now().subtract(const Duration(hours: 5)),
+            userName: '王五',
+          ),
+        ],
+      );
+    }
   }
 
   Future<void> _submitReview() async {
     if (_reviewController.text.isEmpty || _userRating == 0) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入评论内容并选择评分')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('请输入评论内容并选择评分')));
       return;
     }
 
     // 实现提交评论的逻辑
-    await Future.delayed(const Duration(seconds: 1));
-    
-    if (!mounted) return;
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('评论发布成功')),
-    );
-    
-    setState(() {
-      _reviewController.clear();
-      _userRating = 0;
-      _isReviewExpanded = false;
-    });
-    
-    _noteFuture = _fetchNote(); // 刷新笔记数据
+    try {
+      final response = await http.post(
+        Uri.parse('http://localhost:8080/api/review'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'noteId': widget.noteId,
+          'rating': _userRating,
+          'comment': _reviewController.text,
+          // Add user authentication token here
+        }),
+      );
+
+      if (response.statusCode == 201) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('评论发布成功')));
+
+        setState(() {
+          _reviewController.clear();
+          _userRating = 0;
+          _isReviewExpanded = false;
+        });
+
+        _noteFuture = _fetchNote(); // 刷新笔记数据
+      } else {
+        throw Exception('Failed to submit review: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error submitting review: $e');
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('评论发布失败: $e')));
+    }
   }
 
   @override
@@ -118,16 +150,11 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                 // 实现分享功能
               }
             },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'share',
-                child: Text('分享'),
-              ),
-              const PopupMenuItem(
-                value: 'delete',
-                child: Text('删除'),
-              ),
-            ],
+            itemBuilder:
+                (context) => [
+                  const PopupMenuItem(value: 'share', child: Text('分享')),
+                  const PopupMenuItem(value: 'delete', child: Text('删除')),
+                ],
           ),
         ],
       ),
@@ -137,17 +164,17 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          
+
           if (snapshot.hasError) {
             return Center(child: Text('加载失败: ${snapshot.error}'));
           }
-          
+
           if (!snapshot.hasData) {
             return const Center(child: Text('找不到笔记'));
           }
-          
+
           final note = snapshot.data!;
-          
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -164,7 +191,9 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                   children: [
                     CircleAvatar(
                       radius: 16,
-                      child: Text(note.authorName[0]),
+                      child: Text(
+                        note.authorName.isNotEmpty ? note.authorName[0] : '?',
+                      ),
                     ),
                     const SizedBox(width: 8),
                     Text(note.authorName),
@@ -173,17 +202,22 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: note.tags.map((tag) {
-                    return Chip(
-                      label: Text(tag),
-                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      padding: EdgeInsets.zero,
-                      labelPadding: const EdgeInsets.symmetric(horizontal: 8),
-                    );
-                  }).toList(),
-                ),
+                if (note.tags.isNotEmpty)
+                  Wrap(
+                    spacing: 8,
+                    children:
+                        note.tags.map((tag) {
+                          return Chip(
+                            label: Text(tag),
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                            padding: EdgeInsets.zero,
+                            labelPadding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                            ),
+                          );
+                        }).toList(),
+                  ),
                 const SizedBox(height: 16),
                 const Divider(),
                 const SizedBox(height: 16),
@@ -274,7 +308,9 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               children: [
                 CircleAvatar(
                   radius: 16,
-                  child: Text(review.userName[0]),
+                  child: Text(
+                    review.userName.isNotEmpty ? review.userName[0] : '?',
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Text(
@@ -294,7 +330,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
               ],
             ),
             const SizedBox(height: 8),
-            Text(review.content),
+            Text(review.comment),
             const SizedBox(height: 4),
             Text(
               _formatDate(review.createdAt),
@@ -313,26 +349,41 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
   void _showDeleteConfirmation() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('删除笔记'),
-        content: const Text('确定要删除这篇笔记吗？此操作不可撤销。'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text('取消'),
+      builder:
+          (context) => AlertDialog(
+            title: const Text('删除笔记'),
+            content: const Text('确定要删除这篇笔记吗？此操作不可撤销。'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('取消'),
+              ),
+              TextButton(
+                onPressed: () async {
+                  try {
+                    await http.delete(
+                      Uri.parse(
+                        'http://localhost:8080/api/note/${widget.noteId}',
+                      ),
+                      // Add authentication headers here
+                    );
+
+                    if (!mounted) return;
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop(); // 返回上一页
+                  } catch (e) {
+                    print('Error deleting note: $e');
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('删除失败: $e')));
+                  }
+                },
+                child: const Text('删除'),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              // 实现删除笔记的逻辑
-              Navigator.of(context).pop();
-              Navigator.of(context).pop(); // 返回上一页
-            },
-            child: const Text('删除'),
-          ),
-        ],
-      ),
     );
   }
 }
