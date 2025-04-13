@@ -1,8 +1,9 @@
+// TODO Other functions like share, delete, edit haven't been implemented yet
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:meleto/models/note.dart';
-import 'package:meleto/models/review.dart';
+// import 'package:meleto/models/review.dart';
 import 'package:meleto/screens/notes/edit_note_screen.dart';
 
 class NoteDetailScreen extends StatefulWidget {
@@ -102,6 +103,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
         }),
       );
 
+      if (!mounted) return;
       if (response.statusCode == 201) {
         ScaffoldMessenger.of(
           context,
@@ -118,7 +120,6 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
         throw Exception('Failed to submit review: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error submitting review: $e');
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('评论发布失败: $e')));
@@ -133,11 +134,21 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.edit),
-            onPressed: () {
+            onPressed: () async {
+              final note = await _noteFuture;
+              if (!mounted) return;
+
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => EditNoteScreen(noteId: widget.noteId),
+                  builder:
+                      (context) => EditNoteScreen(
+                        noteId: widget.noteId,
+                        noteAuthorId: note.authorId,
+                        noteContent: note.content,
+                        noteTitle: note.title,
+                        isPublic: note.isPublic,
+                      ),
                 ),
               );
             },
@@ -374,7 +385,6 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                     Navigator.of(context).pop();
                     Navigator.of(context).pop(); // 返回上一页
                   } catch (e) {
-                    print('Error deleting note: $e');
                     ScaffoldMessenger.of(
                       context,
                     ).showSnackBar(SnackBar(content: Text('删除失败: $e')));

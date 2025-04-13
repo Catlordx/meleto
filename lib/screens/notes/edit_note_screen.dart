@@ -1,12 +1,24 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:meleto/models/note.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class EditNoteScreen extends StatefulWidget {
   final String noteId;
-  
+  final String noteTitle;
+  final String noteContent;
+  final String noteAuthorId;
+  final bool isPublic;
+
   const EditNoteScreen({
     super.key,
     required this.noteId,
+    required this.noteTitle,
+    required this.noteContent,
+    required this.noteAuthorId,
+    required this.isPublic,
   });
 
   @override
@@ -39,38 +51,24 @@ class _EditNoteScreenState extends State<EditNoteScreen> {
 
   Future<void> _loadNoteData() async {
     setState(() => _isLoading = true);
-    
+
     try {
       // 模拟从API获取笔记数据
-      await Future.delayed(const Duration(seconds: 1));
-      
-      final note = Note(
-        id: widget.noteId,
-        title: 'Flutter 基础知识详解',
-        content: '# Flutter简介\n\nFlutter是Google开发的开源UI工具包，可以仅通过一套代码库构建美观、原生的跨平台应用。\n\n## 为什么选择Flutter?\n\n* 快速开发\n* 表现力强且灵活的UI\n* 原生性能\n\n## Flutter架构\n\nFlutter包含几个关键部分：\n\n1. Dart平台\n2. Flutter引擎\n3. Foundation库\n4. 设计特定的widget\n\n## 开始使用Flutter\n\n```dart\nvoid main() {\n  runApp(MyApp());\n}\n\nclass MyApp extends StatelessWidget {\n  @override\n  Widget build(BuildContext context) {\n    return MaterialApp(\n      home: Scaffold(\n        appBar: AppBar(title: Text(\'Hello Flutter\')),\n        body: Center(child: Text(\'Hello World\')),\n      ),\n    );\n  }\n}\n```',
-        authorId: 'user1',
-        authorName: '张三',
-        createdAt: DateTime.now().subtract(const Duration(days: 2)),
-        tags: ['Flutter', '移动开发', '教程'],
-        likes: 28,
-      );
-      
-      if (!mounted) return;
-      
+
       setState(() {
-        _titleController.text = note.title;
-        _contentController.text = note.content;
-        _tags = List.from(note.tags);
+        _titleController.text = widget.noteTitle;
+        _contentController.text = widget.noteContent;
+        _tags = List.from([]);
         _isLoading = false;
         _isInitialized = true;
       });
     } catch (e) {
       if (!mounted) return;
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('加载失败: ${e.toString()}')),
-      );
-      
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('加载失败: ${e.toString()}')));
+
       setState(() => _isLoading = false);
     }
   }
@@ -94,25 +92,48 @@ class _EditNoteScreenState extends State<EditNoteScreen> {
   Future<void> _updateNote() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      
+
       try {
         // 实现更新笔记的逻辑，比如API调用
-        await Future.delayed(const Duration(seconds: 2)); // 模拟网络请求
-        
-        if (!mounted) return;
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('笔记更新成功！')),
+        // await Future.delayed(const Duration(seconds: 2)); // 模拟网络请求
+        final prefs = await SharedPreferences.getInstance();
+        final token = prefs.getString('token');
+
+        var pub = _isPublic ? 'true' : 'false';
+        final response = await http.put(
+          Uri.parse("http://10.0.2.2:8080/api/note/update?id=${widget.noteId}"),
+          headers: {
+            'Application-Type': 'application/json',
+            'Authorization': 'Bearer $token',
+          },
+          body: json.encode({
+            'title': _titleController.text,
+            'content': _contentController.text,
+            // 'tags': _tags,
+            'isPublic': pub,
+          }),
         );
-        
-        Navigator.pop(context, true); // 返回并传递成功状态
+
+        if (!mounted) return;
+
+        if (response.statusCode == 200) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('笔记更新成功！')));
+
+          Navigator.pop(context, true); // 返回并传递成功状态
+        } else {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('更新失败: ${response.body}')));
+        }
       } catch (e) {
         if (!mounted) return;
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失败: ${e.toString()}')),
-        );
-        
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('更新失败: ${e.toString()}')));
+
         setState(() => _isLoading = false);
       }
     }
@@ -126,20 +147,21 @@ class _EditNoteScreenState extends State<EditNoteScreen> {
         body: const Center(child: CircularProgressIndicator()),
       );
     }
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('编辑笔记'),
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _updateNote,
-            child: _isLoading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('保存'),
+            child:
+                _isLoading
+                    ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Text('保存'),
           ),
         ],
       ),
@@ -194,21 +216,19 @@ class _EditNoteScreenState extends State<EditNoteScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.add),
-                  onPressed: _addTag,
-                ),
+                IconButton(icon: const Icon(Icons.add), onPressed: _addTag),
               ],
             ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              children: _tags.map((tag) {
-                return Chip(
-                  label: Text(tag),
-                  onDeleted: () => _removeTag(tag),
-                );
-              }).toList(),
+              children:
+                  _tags.map((tag) {
+                    return Chip(
+                      label: Text(tag),
+                      onDeleted: () => _removeTag(tag),
+                    );
+                  }).toList(),
             ),
             const SizedBox(height: 16),
             SwitchListTile(

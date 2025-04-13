@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:meleto/screens/home_screen.dart';
 import 'package:meleto/screens/auth/register_screen.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -29,21 +32,64 @@ class _LoginScreenState extends State<LoginScreen> {
 
       try {
         // 模拟网络请求
-        await Future.delayed(const Duration(seconds: 2));
+        // await Future.delayed(const Duration(seconds: 2));
+
+        final response = await http.post(
+          Uri.parse('http://10.0.2.2:8080/api/auth/login'),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'username': _emailController.text,
+            'email': _emailController.text,
+            'password': _passwordController.text,
+          }),
+        );
 
         // 在异步操作后检查 widget 是否仍然在树中
         if (!mounted) return;
 
-        setState(() => _isLoading = false);
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => HomeScreen()),
-        );
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final token = data['token'];
+
+          print('登录成功，获取到token: $token');
+          setState(() {
+            // 假设我们将 token 存储在本地
+            _isLoading = false;
+          });
+          print('登录成功这是数据：$data');
+          SharedPreferences prefs = await SharedPreferences.getInstance();
+          await prefs.setString('token', token);
+          await prefs.setString('username', data['username']);
+          await prefs.setString('email', _emailController.text);
+          await prefs.setString('userid', data['userid'].toString());
+          print(prefs.getString('token'));
+          print(prefs.getString('username'));
+          print(prefs.getString('userid'));
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => const HomeScreen()),
+          );
+        } else {
+          setState(() {
+            _isLoading = false;
+          });
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('登录失败，请检查您的凭据')));
+        }
+
+        // setState(() => _isLoading = false);
+        // Navigator.of(context).pushReplacement(
+        //   MaterialPageRoute(builder: (context) => HomeScreen()),
+        // );
       } catch (e) {
         // 处理可能发生的错误
         if (!mounted) return;
 
         setState(() => _isLoading = false);
         // 您可以在这里添加错误处理，比如显示 SnackBar
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('登录失败: $e')));
       }
       // 在这里添加实际的登录逻辑
     }

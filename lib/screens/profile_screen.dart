@@ -1,8 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:meleto/models/note.dart';
-import 'package:meleto/screens/auth/login_screen.dart';
 import 'package:meleto/screens/notes/note_detail_screen.dart';
 import 'package:meleto/screens/settings_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,7 +20,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   bool _isLoading = false;
 
   // 模拟用户数据
-  final Map<String, dynamic> _userData = {
+  Map<String, dynamic> _userData = {
     'username': '弗拉特',
     'email': 'dev@whut.edu.cn',
     'avatar': 'assets/images/opti.png',
@@ -26,7 +29,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   };
 
   // 模拟用户笔记列表
-  final List<Note> _userNotes = [
+  List<Note> _userNotes = [
     Note(
       id: '1',
       title: 'Flutter 基础知识',
@@ -67,6 +70,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
+    _loadUserData();
   }
 
   @override
@@ -75,7 +79,40 @@ class _ProfileScreenState extends State<ProfileScreen>
     super.dispose();
   }
 
+  Future<void> _loadUserData() async {
+    setState(() {
+      _isLoading = true;
+    });
 
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final resp = await http.get(
+        Uri.parse(
+          "http://10.0.2.2:8080/api/note/getbyuser?id=${prefs.getString("userid")}",
+        ),
+      );
+      setState(() {
+        _userData = {
+          'username': prefs.getString('username') ?? '未知用户',
+          'email': prefs.getString('email') ?? '未知邮箱',
+          'avatar': 'assets/images/opti.png', // 保持默认头像
+          'bio': '一个麻瓜',
+          'joinDate': '2023-01-15',
+        };
+        final data = json.decode(resp.body);
+        _userNotes =
+            (data['data'] as List)
+                .map((noteJson) => Note.fromJson(noteJson))
+                .toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('加载用户数据失败: $e');
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

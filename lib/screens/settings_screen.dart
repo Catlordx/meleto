@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:meleto/screens/auth/login_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -108,6 +109,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         await Future.delayed(const Duration(seconds: 1));
 
         if (!mounted) return;
+
+        final prefs = await SharedPreferences.getInstance();
+        prefs.clear();
 
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (context) => const LoginScreen()),
