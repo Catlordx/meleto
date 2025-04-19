@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:meleto/models/note.dart';
 // import 'package:meleto/models/review.dart';
 import 'package:meleto/screens/notes/edit_note_screen.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class NoteDetailScreen extends StatefulWidget {
   final String noteId;
@@ -92,11 +93,15 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
 
     // 实现提交评论的逻辑
     try {
+      final prefs = await SharedPreferences.getInstance();
       final response = await http.post(
-        Uri.parse('http://localhost:8080/api/review'),
-        headers: {'Content-Type': 'application/json'},
+        Uri.parse('http://10.0.2.2:8080/api/review/like'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ${prefs.getString("token")}',
+        },
         body: json.encode({
-          'noteId': widget.noteId,
+          'noteId': int.parse(widget.noteId),
           'rating': _userRating,
           'comment': _reviewController.text,
           // Add user authentication token here
@@ -104,7 +109,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
       );
 
       if (!mounted) return;
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200) {
         ScaffoldMessenger.of(
           context,
         ).showSnackBar(const SnackBar(content: Text('评论发布成功')));
@@ -240,7 +245,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                 Row(
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.thumb_up_outlined),
+                      icon: const Icon(Icons.comment_bank_outlined),
                       onPressed: () {
                         // 实现点赞功能
                       },
@@ -376,7 +381,7 @@ class _NoteDetailScreenState extends State<NoteDetailScreen> {
                   try {
                     await http.delete(
                       Uri.parse(
-                        'http://localhost:8080/api/note/${widget.noteId}',
+                        'http://10.0.2.2:8080/api/note/${widget.noteId}',
                       ),
                       // Add authentication headers here
                     );

@@ -1,4 +1,10 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:meleto/models/db_helper.dart';
+import 'package:meleto/models/note.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 
 class CreateNoteScreen extends StatefulWidget {
   const CreateNoteScreen({super.key});
@@ -43,25 +49,61 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
   Future<void> _saveNote() async {
     if (_formKey.currentState!.validate()) {
       setState(() => _isLoading = true);
-      
+
       try {
         // 实现保存笔记的逻辑，比如API调用
-        await Future.delayed(const Duration(seconds: 2)); // 模拟网络请求
-        
-        if (!mounted) return;
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('笔记发布成功！')),
+        final dbHelper = DatabaseHelper.instance;
+        final prefs = await SharedPreferences.getInstance();
+        final String authorId = prefs.getString("userid") ?? "";
+        final String authorName = prefs.getString("username") ?? "";
+        final now = DateTime.now();
+        final note = Note(
+          id: '', // ID会在保存时生成
+          title: _titleController.text,
+          content: _contentController.text,
+          authorId: authorId,
+          authorName: authorName,
+          createdAt: now,
+          updatedAt: now,
+          tags: List<String>.from(_tags),
+          likes: 0,
+          isPublic: _isPublic,
         );
-        
+
+        await dbHelper.saveNote(note);
+
+        final resp = await http.post(
+          Uri.parse("http://10.0.2.2:8080/api/note/create"),
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ${prefs.getString('token')}',
+          },
+          body: json.encode({
+            'title': note.title,
+            'content': note.content,
+            'isPublic': note.isPublic,
+          }),
+        );
+
+        if (resp.statusCode != 200) {
+          throw Exception('Failed to create note');
+        }
+        // await Future.delayed(const Duration(seconds: 2)); // 模拟网络请求
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('笔记发布成功！')));
+
         Navigator.pop(context, true); // 返回并传递成功状态
       } catch (e) {
         if (!mounted) return;
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('发布失败: ${e.toString()}')),
-        );
-        
+
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('发布失败: ${e.toString()}')));
+
         setState(() => _isLoading = false);
       }
     }
@@ -75,13 +117,14 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _saveNote,
-            child: _isLoading
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('发布'),
+            child:
+                _isLoading
+                    ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Text('发布'),
           ),
         ],
       ),
@@ -136,21 +179,19 @@ class _CreateNoteScreenState extends State<CreateNoteScreen> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  icon: const Icon(Icons.add),
-                  onPressed: _addTag,
-                ),
+                IconButton(icon: const Icon(Icons.add), onPressed: _addTag),
               ],
             ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              children: _tags.map((tag) {
-                return Chip(
-                  label: Text(tag),
-                  onDeleted: () => _removeTag(tag),
-                );
-              }).toList(),
+              children:
+                  _tags.map((tag) {
+                    return Chip(
+                      label: Text(tag),
+                      onDeleted: () => _removeTag(tag),
+                    );
+                  }).toList(),
             ),
             const SizedBox(height: 16),
             SwitchListTile(
